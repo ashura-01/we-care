@@ -27,4 +27,3 @@ node_modules
 package-lock.json
 package.json
 DoctorsList.jsx
-api.js
