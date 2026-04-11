@@ -15,6 +15,8 @@ const TYPE_COLORS = {
 const Hospitals = () => {
   const navigate = useNavigate();
 
+  const { user } = useAuth();
+
   // State
   const [hospitals, setHospitals] = useState([]);
   const [mapHospitals, setMapHospitals] = useState([]);
@@ -31,7 +33,16 @@ const Hospitals = () => {
   };
 
   const fetchMapData = async (query) => {
-    const addressToSearch = query || "Dhaka, Bangladesh"; 
+    let addressToSearch = "Dhaka, Bangladesh"; // Ultimate fallback
+
+    if (query) {
+      addressToSearch = query; // Priority 1: User typed in the search bar
+    } else if (user && user.address) {
+      addressToSearch = user.address; // Priority 2: Use the logged-in user's address
+    } else if (user && user.city) {
+      addressToSearch = user.city; // Priority 3: Use the logged-in user's city
+    }
+
     const res = await hospitalController.getNearbyHospitals(addressToSearch);
     if (res.success) setMapHospitals(res.hospitals || []);
   };
@@ -39,7 +50,7 @@ const Hospitals = () => {
   useEffect(() => {
     fetchHospitals();
     fetchMapData(search);
-  }, [search, typeFilter]);
+  },[search, typeFilter, user]);
 
   const handleSearch = (e) => {
     e.preventDefault();
