@@ -31,6 +31,7 @@ const DoctorProfile = () => {
   const [doctor, setDoctor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
+  const [imageError, setImageError] = useState(false);
 
   // Review form state
   const [reviewRating, setReviewRating] = useState(5);
@@ -42,8 +43,13 @@ const DoctorProfile = () => {
     try {
       const res = await api.get(`/doctors/${id}`);
       if (res.data.success) {
-        setDoctor(res.data.doctor);
-        setReviews(res.data.doctor.reviews || []);
+        const doctorData = res.data.doctor;
+        console.log("Doctor data:", doctorData);
+        console.log("Profile image URL:", doctorData.profileImage);
+        
+        setDoctor(doctorData);
+        setReviews(doctorData.reviews || []);
+        setImageError(false);
       }
     } catch (err) {
       console.error("Error fetching doctor:", err);
@@ -65,13 +71,13 @@ const DoctorProfile = () => {
     const result = await reviewController.createReview(id, {
       rating: reviewRating,
       comment: reviewComment.trim(),
+      patientName: user?.name || "Anonymous Patient",
     });
 
     if (result.success) {
       setReviewMsg("Review submitted! Thank you.");
       setReviewComment("");
       setReviewRating(5);
-      // Re-fetch to get updated reviews
       fetchDoctor();
     } else {
       setReviewMsg(result.message || "Failed to submit review.");
@@ -102,10 +108,6 @@ const DoctorProfile = () => {
       </div>
     );
 
-  const imageUrl = doctor.profileImage
-    ? `http://localhost:5600/${doctor.profileImage}`
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=00887f&color=fff&size=256`;
-
   return (
     <div className="min-h-screen bg-[#f4f9f7] relative overflow-hidden p-4 md:p-8">
       {/* Background leaves */}
@@ -127,12 +129,18 @@ const DoctorProfile = () => {
 
             {/* Left: Photo + Fee */}
             <div className="lg:w-1/3 flex flex-col items-center gap-5">
-              <div className="w-48 h-48 md:w-64 md:h-64 rounded-[30px] md:rounded-[40px] overflow-hidden border-[8px] md:border-[10px] border-white shadow-2xl">
+              <div className="w-48 h-48 md:w-64 md:h-64 rounded-[30px] md:rounded-[40px] overflow-hidden border-[8px] md:border-[10px] border-white shadow-2xl bg-gray-100">
                 <img
-                  src={imageUrl}
-                  alt={doctor.user?.name}
+                  src={imageError ? `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=68B2A0&color=fff&size=256` : doctor.profileImage}
+                  alt={doctor.user?.name || "Doctor"}
                   className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=00887f&color=fff&size=256`; }}
+                  onError={(e) => {
+                    console.error("Image failed to load:", doctor.profileImage);
+                    setImageError(true);
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=68B2A0&color=fff&size=256`;
+                  }}
+                  onLoad={() => console.log("Image loaded successfully from Cloudinary")}
                 />
               </div>
 

@@ -9,7 +9,7 @@ const Settings = () => {
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // Edit mode tracking
+  const [isEditing, setIsEditing] = useState(false);
   const [hospitalNames, setHospitalNames] = useState([]);
 
   useEffect(() => {
@@ -39,7 +39,6 @@ const Settings = () => {
   const isDoctor =
     (user?.role || localStorage.getItem("userRole")) === "doctor";
 
-  // Form data will only initialize when not in edit mode
   useEffect(() => {
     if (user && !isEditing) {
       setFormData({
@@ -54,7 +53,7 @@ const Settings = () => {
         experience: user?.experience || "",
         hospital: user?.hospital || "",
         fees: user?.fees || "",
-        profilePicture: user?.profileImage || user?.profilePicture || "",
+        profilePicture: user?.profileImage || user?.profilePicture || user?.photoURL || "",
         profilePictureFile: null,
       });
     }
@@ -88,7 +87,7 @@ const Settings = () => {
 
       if (data.success) {
         alert("Profile updated successfully!");
-        setIsEditing(false); // Disable edit mode after saving
+        setIsEditing(false);
         
         if (data.doctor?.profileImage) {
           setFormData((prev) => ({
@@ -97,12 +96,10 @@ const Settings = () => {
             profilePictureFile: null,
           }));
         }
-        
-        // Optional: window.location.reload(); 
       } else {
         alert(data.message || "Failed to update profile");
       }
-    } catch (error) {
+    } catch {
       alert("Something went wrong!");
     } finally {
       setIsLoading(false);
@@ -111,15 +108,23 @@ const Settings = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Canceling will let useEffect refill the form with old data
   };
 
-  // Input field styling for edit and view modes
   const inputClassName = `w-full rounded-[16px] px-4 py-3 outline-none transition-all ${
     isEditing
       ? "border border-[#00887f]/20 bg-white/90 text-[#1d5f71] placeholder:text-[#7a9aa2] focus:border-[#00887f]"
       : "border border-transparent bg-white/40 text-[#4f7f89] cursor-not-allowed"
   }`;
+
+  // Helper function to get profile image URL
+  const getProfileImageUrl = () => {
+    if (formData.profilePicture) {
+      return formData.profilePicture;
+    }
+    // Fallback to UI Avatars API
+    const userName = formData.name || user?.name || "User";
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=68B2A0&color=fff`;
+  };
 
   return (
     <div className="min-h-screen bg-[#f4f9f7] pb-20 relative overflow-hidden">
@@ -186,21 +191,11 @@ const Settings = () => {
             {isDoctor && (
               <div className="mb-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <div className="relative flex h-[100px] w-[100px] shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white/80 shadow-md">
-                  {formData.profilePicture ? (
-                    <img
-                      src={formData.profilePicture}
-                      alt="Profile"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <svg
-                      className="h-10 w-10 text-[#7a9aa2]"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                    </svg>
-                  )}
+                  <img
+                    src={getProfileImageUrl()}
+                    alt="Profile"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 {isEditing && (
                   <div>
@@ -249,7 +244,7 @@ const Settings = () => {
                   type="email"
                   name="email"
                   value={formData.email}
-                  disabled // Email cannot be edited
+                  disabled
                   className="w-full rounded-[16px] border border-transparent bg-white/40 px-4 py-3 text-[#4f7f89] outline-none cursor-not-allowed"
                 />
               </div>
@@ -277,7 +272,7 @@ const Settings = () => {
                   type="text"
                   name="role"
                   value={formData.role}
-                  disabled // Role cannot be edited
+                  disabled
                   className="w-full rounded-[16px] border border-transparent bg-white/40 px-4 py-3 capitalize text-[#4f7f89] outline-none cursor-not-allowed"
                 />
               </div>
@@ -418,7 +413,7 @@ const Settings = () => {
               )}
             </div>
 
-            {/* Save & Cancel Buttons (Only visible in Edit Mode) */}
+            {/* Save & Cancel Buttons */}
             {isEditing && (
               <div className="mt-8 flex gap-4">
                 <button
@@ -443,7 +438,7 @@ const Settings = () => {
             )}
           </GlassCard>
 
-          {/* Delete Account Section remains unchanged */}
+          {/* Delete Account Section */}
           <GlassCard className="rounded-[32px] border border-red-200/60 bg-white/60 px-5 py-6 shadow-xl backdrop-blur-xl md:px-8 md:py-8">
             <div className="mb-4">
               <p className="mt-1 text-[14px] font-medium text-[#4f7f89]">

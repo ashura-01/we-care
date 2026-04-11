@@ -1,7 +1,7 @@
 import api from "./api";
 
 export const reviewController = {
-  // GET /reviews/:doctorId
+
   getDoctorReviews: async (doctorId) => {
     try {
       const response = await api.get(`/reviews/${doctorId}`);
@@ -12,9 +12,13 @@ export const reviewController = {
   },
 
   // POST /reviews/:doctorId
-  createReview: async (doctorId, { rating, comment }) => {
+  createReview: async (doctorId, { rating, comment, patientName }) => {
     try {
-      const response = await api.post(`/reviews/${doctorId}`, { rating, comment });
+      const response = await api.post(`/reviews/${doctorId}`, {
+        rating,
+        comment,
+        patientName
+      });
       return response.data;
     } catch (error) {
       return { success: false, message: error.response?.data?.message || "Failed to submit review" };

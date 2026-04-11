@@ -14,6 +14,7 @@ const DoctorsPage = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [imageErrors, setImageErrors] = useState({}); // Track failed images
   const doctorsPerPage = 8;
 
   // Fetch specializations for the filter dropdown
@@ -43,6 +44,8 @@ const DoctorsPage = () => {
         if (res.data.success) {
           setDoctors(res.data.doctors);
           setPagination(res.data.pagination || {});
+          // Reset image errors when new doctors load
+          setImageErrors({});
         }
       } catch (error) {
         console.error("Error fetching doctors:", error);
@@ -61,6 +64,24 @@ const DoctorsPage = () => {
   }, [searchTerm, specialty, sortBy]);
 
   const forestColors = ["#004b43", "#1b4332", "#007a71", "#2d6a4f"];
+
+  // Helper function to get image source
+  const getImageSrc = (doctor) => {
+    const doctorId = doctor._id;
+    
+    // If this image has failed before, use avatar
+    if (imageErrors[doctorId]) {
+      return `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=00887f&color=fff&size=128&bold=true`;
+    }
+    
+    // If there's a profileImage (Cloudinary URL), use it directly
+    if (doctor.profileImage) {
+      return doctor.profileImage;
+    }
+    
+    // Fallback to avatar
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || "Dr")}&background=00887f&color=fff&size=128&bold=true`;
+  };
 
   return (
     <div className="min-h-screen bg-[#f4f9f7] pb-32 relative overflow-hidden">
@@ -150,15 +171,15 @@ const DoctorsPage = () => {
                   {/* Avatar */}
                   <div className="w-[80px] h-[80px] md:w-[90px] md:h-[90px] rounded-full overflow-hidden shrink-0 border-[4px] border-white shadow-lg bg-gray-100">
                     <img
-                      src={
-                        doc.profileImage
-                          ? `http://localhost:5600/${doc.profileImage}`
-                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.user?.name || "Dr")}&background=00887f&color=fff&size=128`
-                      }
+                      src={getImageSrc(doc)}
                       alt={doc.user?.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.user?.name || "Dr")}&background=00887f&color=fff&size=128`;
+                      onError={() => {
+                        // Mark this image as failed and force re-render
+                        setImageErrors(prev => ({
+                          ...prev,
+                          [doc._id]: true
+                        }));
                       }}
                     />
                   </div>
