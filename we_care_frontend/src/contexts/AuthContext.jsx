@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react'; 
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authController } from '../api/authController';
 import api from '../api/api';
@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const isInitialLoad = useRef(true); 
 
   const isPublicPage = 
     location.pathname.startsWith('/login') || 
@@ -29,14 +30,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userRole');
     localStorage.removeItem('userId');
     setUser(null);
-
     if (!isPublicPage) {
       navigate('/login');
     }
   }, [navigate, isPublicPage]);
 
   const checkAuth = useCallback(async () => {
-    if (isPublicPage && !user) { 
+    if (!isInitialLoad.current && isPublicPage && !user) { 
       setLoading(false);
       return;
     }
@@ -57,6 +57,7 @@ export const AuthProvider = ({ children }) => {
               ? userData.role
               : localStorage.getItem('userRole') || 'patient',
         });
+        localStorage.setItem('userId', userData._id || userData.id);
       } else {
         clearAuthData(); 
       }
@@ -66,8 +67,9 @@ export const AuthProvider = ({ children }) => {
       }
     } finally {
       setLoading(false);
+      isInitialLoad.current = false; 
     }
-  }, [clearAuthData, isPublicPage]); 
+  }, [clearAuthData, isPublicPage]);
 
   useEffect(() => {
     checkAuth();
@@ -93,21 +95,27 @@ export const AuthProvider = ({ children }) => {
       api.interceptors.response.eject(interceptor);
       window.removeEventListener('focus', handleFocus);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkAuth, isPublicPage]); 
+
+  useEffect(() => {
+    if (user && (location.pathname === '/login' || location.pathname.startsWith('/signup'))) {
+        navigate('/');
+    }
+  }, [user, location.pathname, navigate]);
 
   const loginUser = async (incomingData) => {
     try {
       const response = await api.get('/profile');
       if (response.data?.success && response.data?.user) {
         const userData = response.data.user;
-        const isDoctor = !!response.data.doctor;
         setUser({
           ...userData,
-          isDoctor,
+          isDoctor: !!response.data.doctor,
           photoURL: response.data.doctor?.profileImage || userData.photoURL || null,
-          role: isDoctor ? 'doctor' : (userData.role || 'patient'),
+          role: response.data.doctor ? 'doctor' : (userData.role || 'patient'),
         });
+        localStorage.setItem('userId', userData._id || userData.id);
       }
     } catch {
       const isDoctor = incomingData?.isDoctor || localStorage.getItem('userRole') === 'doctor';
