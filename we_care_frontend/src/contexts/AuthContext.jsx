@@ -1,11 +1,12 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { authController } from '../api/authController';
 import api from '../api/api';
 
-// 🌟 FIX 1: We must EXPORT the context so useAuth.js can see it
+// FIX 1: We must EXPORT the context so useAuth.js can see it
 export const AuthContext = createContext(undefined);
 
-// 🌟 FIX 2: We must EXPORT useAuth so NavBar.jsx can see it
+// FIX 2: We must EXPORT useAuth so NavBar.jsx can see it
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -17,6 +18,14 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  const clearAuthData = useCallback(() => {
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
+    setUser(null);
+    navigate('/login');
+  }, [navigate]);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -29,7 +38,6 @@ export const AuthProvider = ({ children }) => {
         setUser({
           ...userData,
           isDoctor,
-          // 🌟 FIX 3: Changed 'u' to 'userData' to stop the background crash
           photoURL: response.data.doctor?.profileImage || userData.photoURL || null,
           role: isDoctor
             ? 'doctor'
@@ -48,18 +56,10 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const clearAuthData = () => {
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userId');
-    setUser(null);
-  };
+  }, [clearAuthData]);
 
   useEffect(() => {
     checkAuth();
-    const interval = setInterval(checkAuth, 30000);
-    return () => clearInterval(interval);
   }, [checkAuth]);
 
   const loginUser = async (incomingData) => {
