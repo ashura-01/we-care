@@ -3,8 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// --- VITE FIX FOR LEAFLET ICONS ---
-// Leaflet sometimes loses track of its default pin images in React/Vite. This fixes it permanently.
+
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -17,19 +16,18 @@ L.Icon.Default.mergeOptions({
 });
 // -----------------------------------
 
-// Helper component: Smoothly pans the map to a new location when the user searches
+
 const MapUpdater = ({ center }) => {
   const map = useMap();
   useEffect(() => {
     if (center) {
-      map.setView([center.lat, center.lng], 13); // 13 is a good zoom level for city scale
+      map.setView([center.lat, center.lng], 18); 
     }
   }, [center, map]);
   return null;
 };
 
 const HospitalMap = ({ centerLocation, hospitals }) => {
-  // Default to Dhaka coordinates if no center is provided yet
   const defaultCenter = [23.8103, 90.4125]; 
   const mapCenter = centerLocation ? [centerLocation.lat, centerLocation.lng] : defaultCenter;
 
@@ -38,10 +36,10 @@ const HospitalMap = ({ centerLocation, hospitals }) => {
       <MapContainer 
         center={mapCenter} 
         zoom={13} 
-        scrollWheelZoom={false} // Prevents the map from zooming when scrolling down the page
+        scrollWheelZoom={false}
         className="w-full h-full z-0"
       >
-        {/* The actual street map background */}
+  
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

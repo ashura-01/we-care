@@ -174,7 +174,7 @@ exports.getHospitalNames = async (req, res) => {
 // =========================================================================
 exports.getNearbyHospitals = async (req, res) => {
   try {
-    // 1. Get the address from the frontend request
+
     const { address } = req.body; 
 
     if (!address) {
@@ -186,7 +186,7 @@ exports.getNearbyHospitals = async (req, res) => {
       throw new Error("Geoapify API key is missing in .env file");
     }
 
-    // 2. Geocoding Phase (Text -> Coordinates)
+
     const geocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&format=json&apiKey=${apiKey}`;
     
     const geocodeResponse = await fetch(geocodeUrl);
@@ -198,14 +198,14 @@ exports.getNearbyHospitals = async (req, res) => {
 
     const { lat, lon } = geocodeData.results[0];
 
-    // 3. Places API Phase (Radar Sweep for Hospitals - 5km radius)
+
     const radius = 5000;
     const placesUrl = `https://api.geoapify.com/v2/places?categories=healthcare.hospital&filter=circle:${lon},${lat},${radius}&bias=proximity:${lon},${lat}&limit=10&apiKey=${apiKey}`;
     
     const placesResponse = await fetch(placesUrl);
     const placesData = await placesResponse.json();
 
-    // 4. Clean up the massive Geoapify payload for React
+
     const nearbyHospitals = placesData.features.map(feature => ({
       name: feature.properties.name || "Unnamed Hospital/Clinic",
       address: feature.properties.formatted,
@@ -216,10 +216,10 @@ exports.getNearbyHospitals = async (req, res) => {
       }
     }));
 
-    // 5. Send back the clean data
+
     res.json({
       success: true,
-      centerLocation: { lat, lng: lon }, // React needs this to center the map
+      centerLocation: { lat, lng: lon },
       hospitals: nearbyHospitals
     });
 
