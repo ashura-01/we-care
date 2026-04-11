@@ -1,12 +1,10 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authController } from '../api/authController';
 import api from '../api/api';
 
-// FIX 1: We must EXPORT the context so useAuth.js can see it
 export const AuthContext = createContext(undefined);
 
-// FIX 2: We must EXPORT useAuth so NavBar.jsx can see it
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -19,18 +17,32 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isPublicPage = 
+    location.pathname.startsWith('/login') || 
+    location.pathname.startsWith('/signup') || 
+    location.pathname.startsWith('/blogs') ||
+    location.pathname === '/'; 
 
   const clearAuthData = useCallback(() => {
     localStorage.removeItem('userRole');
     localStorage.removeItem('userId');
     setUser(null);
-    navigate('/login');
-  }, [navigate]);
+
+    if (!isPublicPage) {
+      navigate('/login');
+    }
+  }, [navigate, isPublicPage]);
 
   const checkAuth = useCallback(async () => {
+    if (isPublicPage && !user) { 
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await api.get('/profile');
-
       if (response.data?.success && response.data?.user) {
         const userData = response.data.user;
         const isDoctor = !!response.data.doctor;
@@ -46,21 +58,43 @@ export const AuthProvider = ({ children }) => {
               : localStorage.getItem('userRole') || 'patient',
         });
       } else {
-        clearAuthData();
+        clearAuthData(); 
       }
     } catch (error) {
-      // Only log out if it's a 401 Unauthorized, not a random server lag
       if (error.response?.status === 401) {
         clearAuthData();
       }
     } finally {
       setLoading(false);
     }
-  }, [clearAuthData]);
+  }, [clearAuthData, isPublicPage]); 
 
   useEffect(() => {
     checkAuth();
-  }, [checkAuth]);
+
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401 && !isPublicPage) {
+          clearAuthData();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    const handleFocus = () => {
+      if (!isPublicPage) {
+         checkAuth();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      api.interceptors.response.eject(interceptor);
+      window.removeEventListener('focus', handleFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkAuth, isPublicPage]); 
 
   const loginUser = async (incomingData) => {
     try {
@@ -72,11 +106,7 @@ export const AuthProvider = ({ children }) => {
           ...userData,
           isDoctor,
           photoURL: response.data.doctor?.profileImage || userData.photoURL || null,
-          role: isDoctor
-            ? 'doctor'
-            : ['admin', 'super_admin'].includes(userData?.role)
-              ? userData.role
-              : localStorage.getItem('userRole') || 'patient',
+          role: isDoctor ? 'doctor' : (userData.role || 'patient'),
         });
       }
     } catch {
@@ -92,24 +122,23 @@ export const AuthProvider = ({ children }) => {
   const logoutUser = async () => {
     try {
       await authController.logout();
-    } catch (err) {
-      console.error("Logout failed:", err);
     } finally {
-      clearAuthData();
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userId');
+      setUser(null);
+      navigate('/login');
     }
   };
 
-  const value = {
-    user,
-    loginUser,
-    logoutUser,
-    loading,
-    refreshAuth: checkAuth 
-  };
+  const value = { user, loginUser, logoutUser, loading, refreshAuth: checkAuth };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading && !isPublicPage ? (
+        <div className="flex h-screen items-center justify-center">Loading...</div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
