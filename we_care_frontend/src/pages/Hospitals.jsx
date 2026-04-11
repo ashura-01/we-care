@@ -1,64 +1,66 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { hospitalController } from "../api/hospitalController";
-import LeafDecor from "../components/LeafDecor";
 import { useAuth } from "../contexts/AuthContext";
-
-const TYPE_COLORS = {
-  General: "bg-blue-100 text-blue-700",
-  Specialized: "bg-purple-100 text-purple-700",
-  Clinic: "bg-green-100 text-green-700",
-  Diagnostic: "bg-yellow-100 text-yellow-700",
-  Emergency: "bg-red-100 text-red-700",
-};
+import LeafDecor from "../components/LeafDecor";
+import GlassCard from "../components/GlassCard";
+import HospitalCard from "../components/HospitalCard";
 
 const Hospitals = () => {
   const navigate = useNavigate();
-
   const { user } = useAuth();
 
   // State
   const [hospitals, setHospitals] = useState([]);
   const [mapHospitals, setMapHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); 
+  const [apiQuery, setApiQuery] = useState("");       // For triggering the API fetch
   const [typeFilter, setTypeFilter] = useState("");
 
-  const fetchHospitals = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const res = await hospitalController.getAllHospitals({ search, type: typeFilter });
-    if (res.success) setHospitals(res.data || []);
-    setLoading(false);
-  };
+    try {
+      // 1. Fetch Internal Database Partners
+      const res = await hospitalController.getAllHospitals({
+        search: apiQuery,
+        type: typeFilter,
+      });
+      if (res.success) setHospitals(res.data || []);
 
-  const fetchMapData = async (query) => {
-    let addressToSearch = "Dhaka, Bangladesh"; // Ultimate fallback
+      // 2. Logic for Map Address Fallbacks
+      let addressToSearch = "Dhaka, Bangladesh"; // Final fallback
+      if (apiQuery) {
+        addressToSearch = apiQuery;
+      } else if (user?.address) {
+        addressToSearch = user.address;
+      } else if (user?.city) {
+        addressToSearch = user.city;
+      }
 
-    if (query) {
-      addressToSearch = query; // Priority 1: User typed in the search bar
-    } else if (user && user.address) {
-      addressToSearch = user.address; // Priority 2: Use the logged-in user's address
-    } else if (user && user.city) {
-      addressToSearch = user.city; // Priority 3: Use the logged-in user's city
+      // 3. Fetch External Nearby Hospitals (Geoapify/Map API)
+      const mapRes = await hospitalController.getNearbyHospitals(addressToSearch);
+      if (mapRes.success) setMapHospitals(mapRes.hospitals || []);
+      
+    } catch (error) {
+      console.error("Fetch Error:", error);
+    } finally {
+      setLoading(false);
     }
-
-    const res = await hospitalController.getNearbyHospitals(addressToSearch);
-    if (res.success) setMapHospitals(res.hospitals || []);
   };
 
+  
   useEffect(() => {
-    fetchHospitals();
-    fetchMapData(search);
-  },[search, typeFilter, user]);
+    fetchData();
+  }, [apiQuery, typeFilter, user]);
 
-  const handleSearch = (e) => {
+  const handleSearchSubmit = (e) => {
     e.preventDefault();
-    setSearch(searchInput);
+    setApiQuery(searchInput);
   };
 
   const handleCardClick = (hospital) => {
-    // Only navigate if the hospital actually has GPS coordinates!
+    // Navigation with GPS check
     if (hospital.location && hospital.location.lat) {
       navigate("/hospital-map", { state: { hospital } });
     } else {
@@ -66,128 +68,91 @@ const Hospitals = () => {
     }
   };
 
-  // Combine DB partners and Geoapify results into one list for the cards
-  const combinedHospitals = [...hospitals, ...mapHospitals];
+  
+  const combinedHospitals = [
+    ...hospitals,
+    ...mapHospitals.filter(
+      (mh) => !hospitals.some((h) => h.name?.toLowerCase() === mh.name?.toLowerCase())
+    ),
+  ];
 
   return (
-    <div className="min-h-screen bg-[#f4f9f7] pb-20 relative overflow-hidden">
-      <div className="absolute left-[-2%] top-[-2%] z-[0] w-[180px] -rotate-12 pointer-events-none opacity-60">
+    <div className="min-h-screen bg-[#f0f7f4] pb-60 relative overflow-hidden">
+      
+      
+      <div className="absolute left-[-8%] top-[-8%] z-[0] w-[600px] -rotate-12 pointer-events-none opacity-20 blur-[2px]">
         <LeafDecor style={{ "--fill-0": "#005f56" }} />
       </div>
 
-      <section className="relative z-10 pt-[60px]">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-6">
-          {/* Header */}
-          <div className="mb-10 text-center">
-            <h1 className="text-[clamp(30px,5vw,52px)] font-bold text-[#1d5f71] leading-tight">
-              Hospitals & Clinics
-            </h1>
-            <p className="mt-3 text-[16px] font-medium text-[#4f7f89] max-w-xl mx-auto">
-              Find hospitals and medical centers near you
-            </p>
-          </div>
+      <div className="absolute right-[-10%] bottom-[5%] z-[0] w-[700px] rotate-[160deg] pointer-events-none opacity-20 blur-[3px]">
+        <LeafDecor style={{ "--fill-0": "#00887f" }} />
+      </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-10 max-w-2xl mx-auto">
-            <form onSubmit={handleSearch} className="flex gap-3 flex-1">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search by address or city..."
-                className="flex-1 rounded-[14px] border border-[#b8d9d3] bg-white px-4 py-3 text-[#1d5f71] outline-none focus:border-[#00887f] transition-all"
-              />
-              <button
-                type="submit"
-                className="rounded-[14px] bg-[#2C6975] px-5 py-3 text-white font-bold hover:bg-[#1f4655] transition-colors"
-              >
-                Search Location
-              </button>
-            </form>
+      <section className="relative z-[50] pt-16 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <h2 className="text-[clamp(40px,8vw,72px)] font-black text-[#003a46] leading-[0.85] tracking-tighter italic">
+            Medical <span className="text-[#00887f]">Sanctuaries</span>
+          </h2>
+
+          
+          <form onSubmit={handleSearchSubmit} className="mt-16 max-w-[900px] mx-auto flex flex-col md:flex-row gap-5">
+            <GlassCard className="flex-[2.5] p-2 rounded-full border-white/70 shadow-[0_25px_60px_rgba(0,58,70,0.12)]">
+              <div className="flex items-center gap-4 px-5 py-1 md:py-3">
+                <svg className="w-5 h-5 text-[#00887f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Sanctuary name or city..."
+                  className="flex-1 bg-transparent outline-none text-[#003a46] font-bold text-lg md:text-xl placeholder-[#003a46]/20"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                />
+                <button type="submit" className="hidden md:block bg-[#003a46] text-white px-8 py-3 rounded-full font-black text-[10px] uppercase tracking-widest hover:bg-[#00887f] transition-all">
+                  Locate
+                </button>
+              </div>
+            </GlassCard>
+
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="rounded-[14px] border border-[#b8d9d3] bg-white px-4 py-3 text-[#1d5f71] outline-none focus:border-[#00887f] transition-all"
+              className="flex-1 bg-white/50 backdrop-blur-xl border border-white/70 rounded-full px-8 py-4 md:py-5 text-[#003a46] font-black text-xs uppercase tracking-widest outline-none cursor-pointer shadow-xl appearance-none"
             >
               <option value="">All Types</option>
               {["General", "Specialized", "Clinic", "Diagnostic", "Emergency"].map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center items-center h-48">
-              <div className="w-10 h-10 border-4 border-[#68B2A0] border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : combinedHospitals.length === 0 ? (
-            <div className="text-center py-20 text-[#4f7f89] font-medium">
-              No hospitals found for your search.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {combinedHospitals.map((hospital, index) => {
-                // Determine if it's an internal partner (has an _id) or a Geoapify result
-                const isPartner = !!hospital._id;
-
-                return (
-                  <div
-                    key={hospital._id || index}
-                    onClick={() => handleCardClick(hospital)}
-                    className="bg-white rounded-[24px] shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-[#e8f4f1] flex flex-col cursor-pointer hover:-translate-y-1"
-                  >
-                    {/* Card Image / Placeholder */}
-                    {hospital.image ? (
-                      <div className="h-[160px] overflow-hidden">
-                        <img src={hospital.image} alt={hospital.name} className="w-full h-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className="h-[120px] bg-gradient-to-br from-[#e8f4f1] to-[#b8d9d3] flex items-center justify-center relative">
-                        {/* Little badge to show it's a real-world map result */}
-                        {!isPartner && (
-                           <span className="absolute top-3 right-3 bg-white/80 text-[#2C6975] text-[10px] font-bold px-2 py-1 rounded">
-                             Geoapify Radar
-                           </span>
-                        )}
-                        <svg className="w-14 h-14 text-[#68B2A0]" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z" />
-                        </svg>
-                      </div>
-                    )}
-
-                    {/* Card Content */}
-                    <div className="p-5 flex flex-col flex-1">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h3 className="text-[17px] font-bold text-[#1d5f71] leading-snug">
-                          {hospital.name}
-                        </h3>
-                        {/* Partner badge or distance badge */}
-                        {isPartner ? (
-                          <span className={`text-[11px] font-bold px-2 py-1 rounded-full shrink-0 ${TYPE_COLORS[hospital.type] || "bg-gray-100 text-gray-600"}`}>
-                            {hospital.type || "Partner"}
-                          </span>
-                        ) : (
-                          <span className="bg-gray-100 text-gray-600 text-[11px] font-bold px-2 py-1 rounded-full shrink-0">
-                            {Math.round(hospital.distanceMeters)}m away
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1 text-[13px] text-[#4f7f89] mb-1">
-                        📍 {hospital.address} {hospital.city ? `, ${hospital.city}` : ""}
-                      </div>
-
-                      <div className="mt-auto pt-4 text-[#2C6975] text-sm font-semibold flex items-center justify-end">
-                        View on Map &rarr;
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </form>
         </div>
       </section>
+
+      
+      <div className="relative z-[40] max-w-[1400px] mx-auto px-4 md:px-8 mt-24">
+        {loading ? (
+          <div className="text-center py-32 font-black text-[#00887f] text-3xl animate-pulse italic">
+            locating sanctuaries...
+          </div>
+        ) : combinedHospitals.length === 0 ? (
+          <div className="text-center py-20 text-[#4f7f89] font-medium text-xl">
+            No sanctuaries found in this realm.
+          </div>
+        ) : (
+          
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 md:gap-x-12 gap-y-6 md:gap-y-12">
+            {combinedHospitals.map((hospital, index) => (
+              <div 
+                key={hospital._id || `map-${index}`}
+                className="w-full cursor-pointer"
+                onClick={() => handleCardClick(hospital)}
+              >
+                <HospitalCard hospital={hospital} index={index} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
